@@ -12,7 +12,11 @@ from common import MAX_BYTES, SafeError, article_id, canonical_url, clean_text, 
 class ArticleRedirects(HTTPRedirectHandler):
     def redirect_request(self, req, fp, code, msg, headers, newurl):
         # Revalidate every hop; never follow links to other hosts or login endpoints.
-        return super().redirect_request(req, fp, code, msg, headers, canonical_url(newurl))
+        try:
+            target = canonical_url(newurl)
+        except SafeError:
+            raise SafeError("redirect_blocked_provide_content") from None
+        return super().redirect_request(req, fp, code, msg, headers, target)
 
 
 def fetch(url):

@@ -35,7 +35,7 @@
 | `images_not_read` | 图片未读取；总结仅涵盖文字 |
 | `table_layout_requires_review` | 表格转为纯文本，回看原始材料确认对应关系 |
 
-完整性检测是启发式，不能证明网页完整。链接仅允许 HTTPS 公众号文章路径，逐次验证重定向；禁止登录端点及跨域跳转，不使用系统代理和持久 Cookie。微信可能拒绝自动读取，`fetch_failed_provide_content` 时按 SKILL.md 走已有浏览器或正文输入路径。普通 HTML 必须有 `article` 或 `#js_content`，不把整个页面当作正文。
+完整性检测是启发式，不能证明网页完整。链接仅允许 HTTPS 公众号文章路径，逐次验证重定向；禁止登录端点及跨域跳转，不使用系统代理和持久 Cookie。微信可能拒绝自动读取，`fetch_failed_provide_content` 或 `redirect_blocked_provide_content` 时按 SKILL.md 走已有浏览器或正文输入路径。普通 HTML 必须有 `article` 或 `#js_content`，不把整个页面当作正文。
 
 ## 保存：`python scripts/save.py`
 
