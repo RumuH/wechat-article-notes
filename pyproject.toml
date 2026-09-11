@@ -1,0 +1,17 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "wechat-article-notes"
+version = "0.1.0"
+description = "Agent skill for reading WeChat articles and saving private Markdown notes"
+requires-python = ">=3.11"
+license = "MIT"
+dependencies = ["beautifulsoup4>=4.12,<5"]
+
+[project.optional-dependencies]
+test = ["PyYAML>=6,<7"]
+
+[tool.setuptools]
+packages = []
