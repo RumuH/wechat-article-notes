@@ -102,6 +102,9 @@ def metadata_of(path):
 
 
 def validate_note(payload):
+    for flag in ("force_new", "allow_partial"):
+        if flag in payload and not isinstance(payload[flag], bool):
+            raise SafeError("invalid_boolean")
     article = payload["article"]
     body = clean_text(article["body"])
     warnings = article.get("warnings", [])
