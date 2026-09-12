@@ -7,6 +7,7 @@ from urllib.request import HTTPRedirectHandler, ProxyHandler, Request, build_ope
 from bs4 import BeautifulSoup
 
 from common import MAX_BYTES, SafeError, article_id, canonical_url, clean_text, digest, quality, run
+from browser_capture import parse_capture
 
 
 class ArticleRedirects(HTTPRedirectHandler):
@@ -75,12 +76,22 @@ def parse_html(raw):
 
 def extract(payload):
     kind = payload.get("kind")
+    details = {}
     source = canonical_url(payload.get("source", ""))
     metadata = {key: "" for key in ("title", "author", "account", "published_at")}
     if kind == "url":
         source = canonical_url(payload["url"])
-        raw, source = fetch(source)
+        try:
+            raw, source = fetch(source)
+        except SafeError as exc:
+            return {"status": "failed", "error": str(exc), "next_action": "read_browser"}
         body, metadata, warnings = parse_html(raw)
+    elif kind == "browser":
+        captured = parse_capture(payload.get("capture"))
+        if "status" in captured:
+            return captured
+        source, body = captured["source"], captured["body"]
+        metadata, warnings, details = captured["metadata"], captured["warnings"], captured["details"]
     elif kind == "file":
         path = Path(payload["path"]).expanduser().resolve()
         if path.suffix.lower() not in (".html", ".htm", ".md", ".txt"):
@@ -114,12 +125,15 @@ def extract(payload):
         metadata["title"] = heading.group(1) if heading else ""
     body_hash = digest(body)
     blocked = any(w in warnings for w in ("insufficient_text", "image_dominant", "article_body_missing"))
-    return {
+    result = {
         "status": "needs_input" if blocked else "success",
         "warnings": warnings,
-        "article": {**metadata, "source": source, "body": body, "body_hash": body_hash,
+        "article": {**metadata, **details, "source": source, "body": body, "body_hash": body_hash,
                     "article_id": article_id(source, body_hash), "warnings": warnings},
     }
+    if kind == "url" and blocked:
+        result["next_action"] = "read_browser"
+    return result
 
 
 if __name__ == "__main__":

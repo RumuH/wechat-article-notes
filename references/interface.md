@@ -22,6 +22,10 @@
 
 `kind: html` 使用 `text` 字段传入 HTML。文件支持 UTF-8 的 HTML/HTM/MD/TXT，不猜测其他编码。输入可附加 `title`、`author`、`account`、`published_at`、`source`；仅填写用户提供或页面中实际看到的信息。`source` 只接受公众号文章 URL，未知来源留空。不会从本地文件名生成元数据。
 
+`kind: browser` 接收 `scripts/browser_capture.js` 在宿主浏览器中返回的完整 JSON 对象，不需要用户额外操作。详见 [浏览器流程](browser.md)。采集器返回 `capture.schema_version: 1`；成功时包括 `state: ready`、来源、可见元数据、正文、标题列表、图片状态和 `evidence`。脚本校验正文传输长度和章节内容，统一输出同样的 article；额外保留 `read_method: browser`、`headings`、`images`、`browser_evidence`。这些证据用于发现缺失，不是对浏览器或智能体的真实性认证。
+
+URL 请求失败或未找到正文时，`next_action: read_browser` 指示智能体自动使用浏览器。只有浏览器实际返回 `verification_required` 才请用户完成页面验证；`not_ready` 指示智能体检查同一标签页，不能直接要求用户复制正文。浏览器能力由宿主提供，Python 脚本本身不启动浏览器。
+
 返回 `status`、`warnings`、`article`。article 包含标题等元数据及 `body`、`body_hash`、`article_id`、`warnings`；直接用于保存请求。哈希基于规范化正文计算，无随机盐，属于私人阅读标识，不公开。
 
 警告含义：
@@ -34,6 +38,8 @@
 | `possibly_truncated` | 存在截断标记；先请求完整内容 |
 | `images_not_read` | 图片未读取；总结仅涵盖文字 |
 | `table_layout_requires_review` | 表格转为纯文本，回看原始材料确认对应关系 |
+| `images_not_loaded` | 图片仍是占位图或未载入，先尝试浏览器加载，不能宣称已看图 |
+| `browser_end_unconfirmed` | 没找到正文结束节点，回到页面核对末尾 |
 
 完整性检测是启发式，不能证明网页完整。链接仅允许 HTTPS 公众号文章路径，逐次验证重定向；禁止登录端点及跨域跳转，不使用系统代理和持久 Cookie。微信可能拒绝自动读取，`fetch_failed_provide_content` 或 `redirect_blocked_provide_content` 时按 SKILL.md 走已有浏览器或正文输入路径。普通 HTML 必须有 `article` 或 `#js_content`，不把整个页面当作正文。
 

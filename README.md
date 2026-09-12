@@ -24,7 +24,9 @@ python -m pip install -e .
 
 > 使用 $wechat-article-notes 整理这篇公众号文章，存入我的知识库：[文章链接]
 
-或提供 HTML、Markdown、TXT 文件、粘贴完整正文。首次使用会询问知识库绝对目录；之后默认入库。需要只看不存时明确说“这次只展示”，需要另存新总结时说“重新整理并保存新版本”。
+默认只需提供链接：先直接请求，失败后智能体自动使用宿主浏览器读取，提取可见正文、元数据与标题结构，再交给脚本校验。只有浏览器实际要求验证/登录时，才请你完成该一步；工具不可用或正文确实不可取得时，才使用 HTML、Markdown、TXT 或粘贴正文作为备用。
+
+首次入库会询问知识库绝对目录；之后默认入库。需要只看不存时明确说“这次只展示”，需要另存新总结时说“重新整理并保存新版本”。
 
 脚本输入使用 stdin JSON；日常由智能体组织请求，你不需要手工构造总结 JSON。详见 [接口与配置](references/interface.md)。
 
@@ -41,9 +43,9 @@ python -m pip install -e .
 
 ## 读取限制
 
-支持公开公众号文章链接和本地 UTF-8 文件。微信可能要求验证或限制自动读取；此时由已有浏览器工具读取公开正文，或请你提供正文/HTML。skill 不保证所有链接可抓取，不绕过验证，不获取付费文章，不追踪公众号更新。
+支持公开公众号文章链接和本地 UTF-8 文件。v0.2.0 增加可执行的只读浏览器采集函数、结构化交接与完整性校验，具体调用和超时恢复见 [浏览器读取](references/browser.md)。需要宿主已有浏览器工具；不会额外安装浏览器或索取 Cookie。skill 不保证所有链接可抓取，不绕过验证，不获取付费文章，不追踪公众号更新。
 
-HTML 脚本不执行，图片和视频不识别；图片主导或正文过短时拒绝完整总结。表格转换成文本时需检查行列关系。缺失元数据留空；不能保证识别所有截断情况。
+离线 HTML 不执行脚本，正常浏览器页面会自行执行网站脚本。正文里的指令不能触发额外操作。辅助脚本不识别图片和视频；浏览器采集会区分真实图片与懒加载占位图，智能体可使用宿主视觉能力进一步看图。图片主导或正文过短时拒绝完整总结。表格转换成文本时需检查行列关系。缺失元数据留空；不能保证识别所有截断情况。
 
 原子保存要求支持硬链接的文件系统（NTFS、常见 Linux 文件系统）；不支持时返回失败。崩溃锁的恢复和去重边界见接口文档。此工具不防御在本机以同一身份并发篡改目录的恶意进程。
 
@@ -64,13 +66,13 @@ git diff --cached
 
 ## GitHub 发布
 
-在通过本地测试、人工阅读验收、完整历史审查与跨平台 CI 后发布 `v0.1.0`。先绑定你拥有的 GitHub 远程仓库，推送 `main`，在仓库设置检查 secret scanning / push protection，然后创建标签和 release。安全能力与覆盖范围以 [GitHub 官方说明](https://docs.github.com/en/code-security/concepts/secret-security/push-protection) 为准；自动扫描不能代替人工脱敏。
+在通过本地测试、人工阅读验收、完整历史审查与跨平台 CI 后发布 `v0.2.0`。先绑定你拥有的 GitHub 远程仓库，推送 `main`，在仓库设置检查 secret scanning / push protection，然后创建标签和 release。安全能力与覆盖范围以 [GitHub 官方说明](https://docs.github.com/en/code-security/concepts/secret-security/push-protection) 为准；自动扫描不能代替人工脱敏。
 
 发布包使用 `git archive` 从已审核提交导出，不能压缩整个工作目录。建议命令：
 
 ```sh
-git tag -a v0.1.0 -m 'Release v0.1.0'
-git archive --format=zip --prefix=wechat-article-notes/ --output=../wechat-article-notes-v0.1.0.zip v0.1.0
+git tag -a v0.2.0 -m 'Release v0.2.0'
+git archive --format=zip --prefix=wechat-article-notes/ --output=../wechat-article-notes-v0.2.0.zip v0.2.0
 ```
 
 ZIP 应只含公开源码、skill 指令、文档、CI 和合成测试材料。初次发布不应包含私人配置、文章、知识库或 `.git`。
