@@ -1,4 +1,4 @@
-"""Configure an external vault and save notes without overwriting existing files."""
+"""Explicitly export Markdown or save to an external vault without overwriting files."""
 import json
 import os
 import re
@@ -149,8 +149,31 @@ def validate_note(payload):
     return metadata, content, now.strftime("%Y-%m-%d")
 
 
+def export_note(payload):
+    value = payload["path"]
+    if not isinstance(value, str) or not Path(value).expanduser().is_absolute():
+        raise SafeError("export_path_must_be_absolute")
+    requested = Path(value).expanduser()
+    if requested.is_symlink():
+        raise SafeError("symlink_target")
+    path = outside_repo(requested)
+    if path.suffix.lower() != ".md":
+        raise SafeError("export_path_must_be_markdown")
+    _, content, _ = validate_note(payload)
+    if path.exists():
+        return {"status": "conflict", "error": "export_file_exists", "path": str(path)}
+    path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        atomic_write(path, content)
+    except FileExistsError:
+        return {"status": "conflict", "error": "export_file_exists", "path": str(path)}
+    return {"status": "success", "path": str(path), "mode": "export"}
+
+
 def save(payload):
-    action = payload.get("action", "save")
+    action = payload.get("action")
+    if action is None:
+        raise SafeError("action_required")
     if action == "show-config":
         return {"status": "success", "vault": str(read_config())}
     if action == "configure":
@@ -160,6 +183,8 @@ def save(payload):
         path.parent.mkdir(parents=True, exist_ok=True)
         atomic_write(path, json.dumps({"vault": str(vault)}, ensure_ascii=False) + "\n", replace=True)
         return {"status": "success", "vault": str(vault)}
+    if action == "export":
+        return export_note(payload)
     if action != "save":
         raise SafeError("unknown_action")
     metadata, content, date = validate_note(payload)

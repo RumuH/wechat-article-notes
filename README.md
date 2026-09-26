@@ -1,8 +1,8 @@
 # 公众号阅读笔记 · wechat-article-notes
 
-让智能体阅读公众号文章，生成有依据的中文结构化笔记，自动保存到你的本地 Markdown 知识库。兼容 Obsidian，无须额外模型 API。
+让智能体阅读公众号文章，生成有依据的中文结构化笔记，按你本次明确选择导出独立 Markdown 文件或保存到本地知识库。兼容 Obsidian，无须额外模型 API。
 
-**English:** An agent skill that reads user-supplied WeChat articles or local HTML/Markdown/text, produces source-grounded Chinese notes, and saves them to a private Markdown vault. The host agent performs summarization; Python handles extraction and safe file persistence. No separate LLM API, telemetry, cookies, or account integration is required.
+**English:** An agent skill that reads user-supplied WeChat articles or local HTML/Markdown/text, produces source-grounded Chinese notes, and either exports a standalone Markdown file or saves to a private vault, as explicitly selected for the current request. The host agent performs summarization; Python handles extraction and safe file persistence. No separate LLM API, telemetry, cookies, or account integration is required.
 
 ## 安装
 
@@ -24,9 +24,13 @@ python -m pip install -e .
 
 > 使用 $wechat-article-notes 整理这篇公众号文章，存入我的知识库：[文章链接]
 
-默认只需提供链接：先直接请求，失败后智能体自动使用宿主浏览器读取，提取可见正文、元数据与标题结构，再交给脚本校验。只有浏览器实际要求验证/登录时，才请你完成该一步；工具不可用或正文确实不可取得时，才使用 HTML、Markdown、TXT 或粘贴正文作为备用。
+或者：
 
-首次入库会询问知识库绝对目录；之后默认入库。需要只看不存时明确说“这次只展示”，需要另存新总结时说“重新整理并保存新版本”。
+> 使用 $wechat-article-notes 整理这篇公众号文章，仅导出为 Markdown 文件，不入库，保存到我指定的目录：[文章链接]
+
+每次需明确输出方式：仅导出、入库或只展示。只提供链接或只说“整理”时，智能体先确认，不因已有配置或上次入库而自动保存。已选择输出方式后，链接先直接请求，失败后智能体自动使用宿主浏览器读取，提取可见正文、元数据与标题结构，再交给脚本校验。只有浏览器实际要求验证/登录时，才请你完成该一步；工具不可用或正文确实不可取得时，才使用 HTML、Markdown、TXT 或粘贴正文作为备用。
+
+独立导出不需要知识库配置；未指定位置时会询问，已有同名文件不会覆盖。首次明确入库会询问知识库绝对目录；之后只有本次明确要求入库时才使用已有配置。需要只看不存时说“这次只展示”，需要入库新总结时说“重新整理并入库保存新版本”。
 
 脚本输入使用 stdin JSON；日常由智能体组织请求，你不需要手工构造总结 JSON。详见 [接口与配置](references/interface.md)。
 
@@ -34,9 +38,10 @@ python -m pip install -e .
 
 ## 保存与隐私
 
-- 知识库必须位于 skill 开源仓库之外，原文不会作为独立文件长期保存。
+- 知识库和独立导出文件必须位于 skill 开源仓库之外，原文不会作为独立文件长期保存。
 - 配置存于用户配置目录，不使用仓库配置保存你的绝对路径。
-- 相同文章与正文返回已有笔记；正文变化或明确重做时另存，保留私人修改。
+- 独立导出不读取或修改知识库配置、不扫描知识库去重，只创建指定的 Markdown 文件；同名文件返回冲突，保留已有内容。
+- 入库时，相同文章与正文返回已有笔记；正文变化或明确重做时另存，保留私人修改。
 - 不向 GitHub 上传阅读记录、文章或总结。没有同步服务，也不自动提交知识库。
 - stdout 中的提取正文和成功路径属于私人结果，别收集为公开 CI 日志。
 - 开源样例完全虚构；作者、源码贡献者与知识库内容相互独立。代码采用 MIT，来源文章的权利不随代码许可证转移。

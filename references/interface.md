@@ -45,6 +45,33 @@ URL 请求失败或未找到正文时，`next_action: read_browser` 指示智能
 
 ## 保存：`python scripts/save.py`
 
+每次必须显式传入 `action`；缺失时返回 `action_required`，不再默认入库。智能体必须先取得用户本次对输出方式的明确选择，配置本身不构成入库授权。两种保存方式共用正文完整性校验和笔记格式。
+
+### 独立导出（不入库）
+
+使用 `export`，传入用户确认的绝对 `.md` 文件路径和与下方入库示例相同的 `article`、`summary`：
+
+```json
+{
+  "action": "export",
+  "path": "/absolute/private/exports/article-note.md",
+  "article": {},
+  "summary": {
+    "abstract": "简短摘要",
+    "claims": "作者的核心观点，标明原文段落",
+    "evidence": "原文案例、数据及段落依据",
+    "limitations": "局限与待核实内容",
+    "analysis": "明确标注的智能体分析",
+    "tags": ["阅读笔记"]
+  },
+  "allow_partial": false
+}
+```
+
+导出无需先调用 `configure` 或 `show-config`，也不会读取或更改知识库配置、扫描知识库或记录入库状态。目标须位于 skill 仓库之外；必要时创建父目录。成功返回 `status: success`、`mode: export` 和实际 `path`。已有同名文件返回 `conflict` / `export_file_exists`，不覆盖、不自动改名；由用户确认另一个文件名。重复文章可导出到不同路径，不执行知识库去重；`force_new` 不控制导出命名。
+
+### 入库（仅在本次明确要求时）
+
 配置使用用户确认的绝对目录：
 
 ```json

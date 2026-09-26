@@ -15,7 +15,7 @@ sys.path.insert(0, str(ROOT / "scripts"))
 from common import SafeError, canonical_url
 from audit_release import scan
 from extract import ArticleRedirects, extract, fetch
-from save import atomic_write, save
+from save import atomic_write, config_path, save
 
 FIXTURE = ROOT / "tests" / "fixtures" / "synthetic.html"
 
@@ -32,7 +32,7 @@ class WorkflowTests(unittest.TestCase):
         self.summary = {"abstract": "虚构实验讨论记录问题的用途。", "claims": "作者认为记录问题可能有帮助（原文 P1）。",
                         "evidence": "12 人，持续两周，自我报告（原文 P2）。", "limitations": "无对照组，不能推广（原文 P2–P3）。",
                         "analysis": "智能体判断：适合作为个人尝试的思路，不能当作已验证结论。", "tags": ["阅读", "虚构实验"]}
-        self.payload = {"article": self.article, "summary": self.summary}
+        self.payload = {"action": "save", "article": self.article, "summary": self.summary}
 
     def tearDown(self):
         self.env.stop()
@@ -134,6 +134,75 @@ class WorkflowTests(unittest.TestCase):
         self.configure()
         self.assertEqual(save({"action": "show-config"})["vault"], str(self.vault))
 
+    def test_action_is_required_even_with_configured_vault(self):
+        request = {key: value for key, value in self.payload.items() if key != "action"}
+        for configured in (False, True):
+            if configured:
+                self.configure()
+            with self.assertRaisesRegex(SafeError, "^action_required$"):
+                save(request)
+        self.assertEqual(list(self.vault.iterdir()), [])
+
+    def test_export_without_vault_or_configuration(self):
+        path = self.base / "exports" / "阅读笔记.md"
+        result = save({**self.payload, "action": "export", "path": str(path)})
+        self.assertEqual(result, {"status": "success", "path": str(path), "mode": "export"})
+        text = path.read_text(encoding="utf-8")
+        self.assertIn("## 摘要", text)
+        self.assertIn("## 来源", text)
+        self.assertFalse(config_path().exists())
+        self.assertFalse(self.vault.exists())
+        self.assertEqual(list(path.parent.iterdir()), [path])
+
+    def test_export_leaves_configured_vault_untouched(self):
+        self.configure()
+        note = Path(save(self.payload)["path"])
+        before_note = note.read_bytes()
+        before_config = config_path().read_bytes()
+        for name in ("first.md", "second.md"):
+            with patch("save.read_config", side_effect=AssertionError("export must not read configuration")):
+                result = save({**self.payload, "action": "export", "path": str(self.base / name)})
+            self.assertEqual(result["status"], "success")
+        self.assertEqual(config_path().read_bytes(), before_config)
+        self.assertEqual(note.read_bytes(), before_note)
+        self.assertEqual(list(self.vault.iterdir()), [note])
+
+    def test_export_conflict_and_validation(self):
+        path = self.base / "existing.md"
+        path.write_text("private edits", encoding="utf-8")
+        request = {**self.payload, "action": "export", "path": str(path)}
+        result = save(request)
+        self.assertEqual(result["status"], "conflict")
+        self.assertEqual(result["error"], "export_file_exists")
+        self.assertEqual(path.read_text(encoding="utf-8"), "private edits")
+        for value, error in (("relative.md", "export_path_must_be_absolute"),
+                             (str(self.base / "note.txt"), "export_path_must_be_markdown"),
+                             (str(ROOT / "note.md"), "private_path_inside_skill")):
+            with self.assertRaisesRegex(SafeError, error):
+                save({**request, "path": value})
+        broken = copy.deepcopy(request)
+        broken["path"] = str(self.base / "invalid" / "note.md")
+        broken["article"]["body"] += "changed"
+        with self.assertRaisesRegex(SafeError, "integrity"):
+            save(broken)
+        self.assertFalse((self.base / "invalid").exists())
+
+    def test_export_atomic_collision_and_symlink(self):
+        path = self.base / "note.md"
+        request = {**self.payload, "action": "export", "path": str(path)}
+        with patch("save.os.link", side_effect=FileExistsError):
+            self.assertEqual(save(request)["error"], "export_file_exists")
+        self.assertEqual(list(self.base.iterdir()), [])
+        target = self.base / "target.md"
+        target.write_text("private", encoding="utf-8")
+        try:
+            path.symlink_to(target)
+        except OSError:
+            self.skipTest("OS does not permit symlinks")
+        with self.assertRaisesRegex(SafeError, "symlink_target"):
+            save(request)
+        self.assertEqual(target.read_text(encoding="utf-8"), "private")
+
     def test_yaml_dedup_and_private_edits(self):
         self.configure()
         result = save(self.payload)
@@ -230,6 +299,20 @@ class WorkflowTests(unittest.TestCase):
         self.assertEqual(saved.returncode, 0)
         self.assertEqual(saved.stderr, b"")
         self.assertTrue(Path(json.loads(saved.stdout)["path"]).is_file())
+
+    def test_export_cli_and_missing_action(self):
+        request = {**self.payload, "action": "export", "path": str(self.base / "note.md")}
+        proc = subprocess.run([sys.executable, str(ROOT / "scripts" / "save.py")],
+                              input=json.dumps(request).encode(), capture_output=True)
+        self.assertEqual(proc.returncode, 0)
+        self.assertEqual(proc.stderr, b"")
+        self.assertEqual(json.loads(proc.stdout)["mode"], "export")
+        self.assertFalse(config_path().exists())
+        del request["action"]
+        proc = subprocess.run([sys.executable, str(ROOT / "scripts" / "save.py")],
+                              input=json.dumps(request).encode(), capture_output=True)
+        self.assertEqual(proc.returncode, 1)
+        self.assertEqual(json.loads(proc.stdout)["error"], "action_required")
 
     def test_release_scanner_detects_without_logging_data(self):
         synthetic = b"ghp_" + b"x" * 36
